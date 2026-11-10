@@ -1,7 +1,15 @@
 ﻿// Holiday Maker – meny och inmatning.
 // Allt SQL ligger i Db.cs.
 
-var db = new Db("TODO: din anslutningssträng");
+// Anslutningssträngen läses från connection.txt (finns inte i git, se connection.example.txt).
+var connectionFile = Path.Combine(AppContext.BaseDirectory, "connection.txt");
+if (!File.Exists(connectionFile))
+{
+    Console.WriteLine("Hittar inte connection.txt. Kopiera connection.example.txt till connection.txt och fyll i ditt lösenord.");
+    return;
+}
+var db = new Db(File.ReadAllText(connectionFile).Trim());
+db.TestConnection();
 int? customerId = null; // vald kund
 
 while (true)

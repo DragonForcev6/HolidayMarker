@@ -1,8 +1,16 @@
 // Alla SQL-anrop. Använd ALLTID parametrar (@namn), aldrig strängsammanslagning.
-// TODO: lägg till NuGet-paket för din databas (t.ex. Npgsql eller Microsoft.Data.SqlClient).
+using MySqlConnector;
 
 public class Db(string connectionString)
 {
+    // Kollar att programmet når databasen. Skriver ut MySQL-versionen.
+    public void TestConnection()
+    {
+        using var conn = new MySqlConnection(connectionString);
+        conn.Open();
+        Console.WriteLine($"Ansluten till MySQL {conn.ServerVersion}, databas: {conn.Database}");
+    }
+
     // Krav 1
     public int AddCustomer(string name, string email, string phone)
         => throw new NotImplementedException();
