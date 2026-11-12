@@ -58,21 +58,44 @@ while (true)
                     Console.WriteLine("Tillgängliga städer: ");
                     db.PrintCities();
                     string city = ReadText("Stad: ");
-                    DateOnly checkIn = ReadDate("Inchecking (yyyy-MM-dd): ");
-                    DateOnly checkOut = ReadDate("Utcheckning (yyyy-MM-dd): ");
+                    DateOnly checkIn = ReadDate("Inchecking (År-Månad-Dag): ");
+                    DateOnly checkOut = ReadDate("Utcheckning (År-Månad-Dag): ");
                     int guests = ReadInt("Antal personer: ");
                     bool needPool = ReadYesNo("Måste ha en pool (ja/nej): ");
                     bool needResturant = ReadYesNo("Måste hotellet ha en resturang? (ja/nej): ");
                     bool sortByRating = ReadYesNo("Sortera på omdöme? (ja = omdöme, nej = pris): ");
                     int? maxBeach = ReadOptionalInt("Max avstånd till stranden (Skriv in antal meter ellet tryck Enter för att gå vidare): ");
-                    int? maxCenter = ReadOptionalInt("Max avståndet till centrum (m, Enter = inget filter): ");
+                    int? maxCenter = ReadOptionalInt("Max avståndet till centrum (Skriv in antal meter ellet tryck Enter för att gå vidare): ");
 
 
                     db.PrintAvailableRooms(city, checkIn, checkOut, guests, needPool, needResturant,
                         maxBeach, maxCenter, sortByRating);
                 }
                 break;
-            case "4": /* TODO: välj rum, datum, antal -> db.CreateBooking -> visa nr + totalpris */ break;
+            case "4":
+                {
+                    if (customerId == null)
+                    {
+                        Console.WriteLine("Välj en kund först (val 2).");
+                        break;
+                    }
+
+                    int roomId = ReadInt("Rum-id: ");
+                    int guests = ReadInt("Antal personer: ");
+                    DateOnly checkIn = ReadDate("Incheckning År-Månad-Dag: ");
+                    DateOnly checkOut = ReadDate("Utcheckning År-Månad-Dag: ");
+
+                    if (checkOut <= checkIn)
+                    {
+                        Console.WriteLine("Utcheckning måste ske efter incheckning.");
+                        break;
+                    }
+
+                    int bookingId = db.CreateBooking(customerId.Value, roomId, checkIn, checkOut, guests);
+                    Console.WriteLine($"Bokning klar med Bokningsnummer: {bookingId}.");
+
+                }
+                break;
             case "5": /* TODO: db.PrintBookings(customerId) */ break;
             case "6": /* TODO: välj bokning, nytt antal -> db.UpdateGuests */ break;
             case "7": /* TODO: välj bokning -> db.DeleteBooking */ break;

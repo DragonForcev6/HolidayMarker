@@ -19,14 +19,14 @@ public class Db(string connectionString)
 
         string sql = @"INSERT INTO Kund (fornamn, efternamn, `e-post`, telefon)
                         VALUES (@fornamn, @efternamn, @epost, @telefon)";
-    
-    using var cmd = new MySqlCommand(sql, conn);
-    cmd.Parameters.AddWithValue("@fornamn", firstName);
-    cmd.Parameters.AddWithValue("@efternamn", lastName);
-    cmd.Parameters.AddWithValue("@epost", email);
-    cmd.Parameters.AddWithValue("@telefon", phone);
-    
-    cmd.ExecuteNonQuery(); // kör INSERT
+
+        using var cmd = new MySqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("@fornamn", firstName);
+        cmd.Parameters.AddWithValue("@efternamn", lastName);
+        cmd.Parameters.AddWithValue("@epost", email);
+        cmd.Parameters.AddWithValue("@telefon", phone);
+
+        cmd.ExecuteNonQuery(); // kör INSERT
         return (int)cmd.LastInsertedId; // id:t som MySql gav ny kund
     }
 
@@ -35,9 +35,9 @@ public class Db(string connectionString)
         using var conn = new MySqlConnection(connectionString);
         conn.Open();
 
-        string sql ="SELECT id, fornamn, efternamn, `e-post`, telefon FROM Kund ORDER BY id";
+        string sql = "SELECT id, fornamn, efternamn, `e-post`, telefon FROM Kund ORDER BY id";
         using var cmd = new MySqlCommand(sql, conn);
-        using var reader =cmd.ExecuteReader();
+        using var reader = cmd.ExecuteReader();
 
         while (reader.Read())
         {
@@ -129,11 +129,65 @@ public class Db(string connectionString)
             Console.WriteLine("Tyvärr hittades inga lediga rum.");
         }
     }
-       
+
 
     // Krav 3 – kolla tillgänglighet + kapacitet igen innan INSERT. Returnerar bokningsnummer.
     public int CreateBooking(int customerId, int roomId, DateOnly checkIn, DateOnly checkOut, int guests)
-        => throw new NotImplementedException();
+    {
+        using var conn = new MySqlConnection(connectionString);
+        conn.Open();
+
+        // Kolla att rummet finns och att det rymmer det antal gäster som önskas.
+        int maxPersons;
+        decimal price;
+
+        using (var cmd = new MySqlCommand("SELECT max_personer, pris_per_natt FROM Rum WHERE id = @roomId", conn))
+        {
+            cmd.Parameters.AddWithValue("@roomId", roomId);
+            using var reader = cmd.ExecuteReader();
+
+            if (!reader.Read())
+                throw new InvalidOperationException("Rummet finns inte.");
+
+            maxPersons = reader.GetInt32("max_personer");
+            price = reader.GetDecimal("pris_per_natt");
+        }
+
+        if (guests > maxPersons)
+            throw new InvalidOperationException($"Rummet rymmer max {maxPersons} personer.");
+
+        // Kolla att rummet är ledigt under den önskade perioden.
+        string checkAvailabilitySql = @"SELECT COUNT(*) FROM Bokningar
+                                        WHERE rum_id = @roomId
+                                          AND incheckning < @checkOut
+                                          AND utcheckning > @checkIn";
+        using var checkAvailabilityCmd = new MySqlCommand(checkAvailabilitySql, conn);
+        checkAvailabilityCmd.Parameters.AddWithValue("@roomId", roomId);
+        checkAvailabilityCmd.Parameters.AddWithValue("@checkIn", checkIn);
+        checkAvailabilityCmd.Parameters.AddWithValue("@checkOut", checkOut);
+
+        int overlappingBookings = Convert.ToInt32(checkAvailabilityCmd.ExecuteScalar());
+        if (overlappingBookings > 0)
+            throw new InvalidOperationException("Rummet är tyvärr inte ledigt under den önskade perioden.");
+
+        // Skapa bokningen.
+        string insertBookingSql = @"INSERT INTO Bokningar (kund_id, rum_id, antal_personer, incheckning, utcheckning)
+                                    VALUES (@customerId, @roomId, @guests, @checkIn, @checkOut)";
+        using var insertBookingCmd = new MySqlCommand(insertBookingSql, conn);
+        insertBookingCmd.Parameters.AddWithValue("@customerId", customerId);
+        insertBookingCmd.Parameters.AddWithValue("@roomId", roomId);
+        insertBookingCmd.Parameters.AddWithValue("@guests", guests);
+        insertBookingCmd.Parameters.AddWithValue("@checkIn", checkIn);
+        insertBookingCmd.Parameters.AddWithValue("@checkOut", checkOut);
+
+        insertBookingCmd.ExecuteNonQuery();
+
+        int nights = checkOut.DayNumber - checkIn.DayNumber;
+        Console.WriteLine($"{nights} nätter x {price} kr = {nights * price} kr");
+
+        return (int)insertBookingCmd.LastInsertedId; // Returnerar bokningsnummer
+
+    }
 
     // Krav 4 – totalpris = antal nätter × pris per natt
     public void PrintBookings(int customerId)
