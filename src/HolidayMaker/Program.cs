@@ -96,7 +96,17 @@ while (true)
 
                 }
                 break;
-            case "5": /* TODO: db.PrintBookings(customerId) */ break;
+            case "5":
+                {
+                    if (customerId == null)
+                    {
+                        Console.WriteLine("Välj en kund först (val 2).");
+                        break;
+                    }
+
+                    db.PrintBookings(customerId.Value);
+                }
+            break;
             case "6": /* TODO: välj bokning, nytt antal -> db.UpdateGuests */ break;
             case "7": /* TODO: välj bokning -> db.DeleteBooking */ break;
             case "0": return;

@@ -189,9 +189,56 @@ public class Db(string connectionString)
 
     }
 
-    // Krav 4 – totalpris = antal nätter × pris per natt
+
     public void PrintBookings(int customerId)
-        => throw new NotImplementedException();
+    {
+        using var conn = new MySqlConnection(connectionString);
+        conn.Open();
+
+        string sql = @"SELECT bk.boknings_id, b.hotell_namn, b.stad, r.rums_nummer,
+                              bk.antal_personer, bk.incheckning, bk.utcheckning, r.pris_per_natt,
+                              DATEDIFF(bk.utcheckning, bk.incheckning) AS natter,
+                              DATEDIFF(bk.utcheckning, bk.incheckning) * r.pris_per_natt AS totalpris
+                    FROM Bokningar bk
+                    JOIN Rum r ON r.id = bk.rum_id
+                    JOIN Boende b ON b.boende_id =r.boende_id
+                    WHERE bk.kund_id = @customerId
+                    ORDER BY bk.incheckning";
+
+        using var cmd = new MySqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("@customerId", customerId);
+        using var reader = cmd.ExecuteReader();
+
+            int count = 0;
+            while (reader.Read())
+            {
+                count++;
+
+                // 1. Läs ut varje kolumn från SELECT (namnen måste matcha SQL-frågan)
+                int bookingId = reader.GetInt32("boknings_id");
+                string hotel = reader.GetString("hotell_namn");
+                string city = reader.GetString("stad");
+                string room = reader.GetString("rums_nummer");
+                int guests = reader.GetInt32("antal_personer");
+                DateTime checkIn = reader.GetDateTime("incheckning");
+                DateTime checkOut = reader.GetDateTime("utcheckning");
+                decimal price = reader.GetDecimal("pris_per_natt");
+                long nights = reader.GetInt64("natter");
+                decimal total = reader.GetDecimal("totalpris");
+
+                // 2. Skriv ut bokningen
+                Console.WriteLine($"Bokning {bookingId}: {hotel} ({city}), rum {room}, {guests} pers, " +
+                                  $"{checkIn:yyyy-MM-dd} - {checkOut:yyyy-MM-dd}, " +
+                                  $"{nights} nätter x {price} kr = {total} kr");
+            }
+
+            if (count == 0)
+            {
+                Console.WriteLine("Kunden har inga bokningar.");
+            }
+
+        
+    }
 
     // Krav 5 – nya antalet måste rymmas i rummet
     public bool UpdateGuests(int bookingId, int guests)
