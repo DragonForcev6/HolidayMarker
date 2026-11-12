@@ -1,4 +1,13 @@
 // Alla SQL-anrop. Använd ALLTID parametrar (@namn), aldrig strängsammanslagning.
+//
+// Varje metod följer samma mönster:
+//   1. Öppna en anslutning (using = stängs automatiskt när metoden är klar)
+//   2. Skriv SQL-frågan som en sträng med @parametrar
+//   3. Skapa ett MySqlCommand och fyll i parametrarna med AddWithValue
+//   4. Kör frågan:
+//        ExecuteReader()   -> SELECT som ger flera rader (läses med while (reader.Read()))
+//        ExecuteScalar()   -> SELECT som ger ett enda värde (t.ex. COUNT(*))
+//        ExecuteNonQuery() -> INSERT/UPDATE/DELETE, returnerar antal ändrade rader
 using MySqlConnector;
 
 public class Db(string connectionString)
@@ -11,7 +20,8 @@ public class Db(string connectionString)
         Console.WriteLine($"Ansluten till MySQL {conn.ServerVersion}, databas: {conn.Database}");
     }
 
-    // Krav 1
+    // Krav 1 – Registrerar en ny kund och returnerar det id som databasen gav kunden.
+    // Kolumnen `e-post` har bindestreck och måste därför skrivas med backticks.
     public int AddCustomer(string firstName, string lastName, string email, string phone)
     {
         using var conn = new MySqlConnection(connectionString);
@@ -30,6 +40,7 @@ public class Db(string connectionString)
         return (int)cmd.LastInsertedId; // id:t som MySql gav ny kund
     }
 
+    // Skriver ut alla kunder så att operatören kan välja ett kund-id (menyval 2).
     public void PrintCustomers()
     {
         using var conn = new MySqlConnection(connectionString);
@@ -51,6 +62,8 @@ public class Db(string connectionString)
         }
     }
 
+    // Skriver ut alla städer som har boenden, på en rad (menyval 3).
+    // DISTINCT tar bort dubbletter om flera hotell ligger i samma stad.
     public void PrintCities()
     {
         using var conn = new MySqlConnection(connectionString);
@@ -81,6 +94,12 @@ public class Db(string connectionString)
         // Sortering kan inte vara en @parameter, så välj mellan två fasta texter.
         string orderBy = sortByRating ? "b.betyg DESC, r.pris_per_natt ASC" : "r.pris_per_natt ASC";
 
+        // Frågan hämtar rum (Rum r) och kopplar ihop dem med sitt hotell (JOIN Boende b).
+        // WHERE-villkoren:
+        //   - rätt stad och rummet rymmer sällskapet
+        //   - valfria filter: "@x = 0 OR ..." / "@x IS NULL OR ..." blir alltid sant när filtret inte används
+        //   - NOT EXISTS: det finns ingen bokning på rummet som överlappar den sökta perioden.
+        //     Utcheckningsdagen räknas som ledig, därför används < och > (inte <= och >=).
         string sql = $@"SELECT r.id, b.hotell_namn, r.rums_nummer, r.max_personer, r.pris_per_natt,
                        b.betyg, b.strand_avstand, b.centrum_avstand, b.pool, b.resturang
                        FROM Rum r
@@ -105,12 +124,13 @@ public class Db(string connectionString)
         cmd.Parameters.AddWithValue("@guests", guests);
         cmd.Parameters.AddWithValue("@needPool", needPool);
         cmd.Parameters.AddWithValue("@needResturant", needRestaurant);
+        // C#:s null är inte samma sak som SQL:s NULL, därför DBNull.Value när filtret inte används.
         cmd.Parameters.AddWithValue("@maxBeach", (object?)maxBeach ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@maxCenter", (object?)maxCenter ?? DBNull.Value);
 
         using var reader = cmd.ExecuteReader();
 
-        int count = 0;
+        int count = 0; // räknar träffarna så att vi kan säga till om inga rum hittades
         while (reader.Read())
         {
             count++;
@@ -132,6 +152,8 @@ public class Db(string connectionString)
 
 
     // Krav 3 – kolla tillgänglighet + kapacitet igen innan INSERT. Returnerar bokningsnummer.
+    // Kontrollen görs igen här (fast sökningen redan filtrerat) eftersom operatören kan skriva in
+    // vilket rum-id som helst. Om något är fel kastas ett undantag som fångas av try/catch i Program.cs.
     public int CreateBooking(int customerId, int roomId, DateOnly checkIn, DateOnly checkOut, int guests)
     {
         using var conn = new MySqlConnection(connectionString);
@@ -156,7 +178,8 @@ public class Db(string connectionString)
         if (guests > maxPersons)
             throw new InvalidOperationException($"Rummet rymmer max {maxPersons} personer.");
 
-        // Kolla att rummet är ledigt under den önskade perioden.
+        // Kolla att rummet är ledigt under den önskade perioden (samma överlappsregel som i sökningen).
+        // ExecuteScalar används eftersom COUNT(*) bara ger ett enda värde.
         string checkAvailabilitySql = @"SELECT COUNT(*) FROM Bokningar
                                         WHERE rum_id = @roomId
                                           AND incheckning < @checkOut
@@ -182,14 +205,18 @@ public class Db(string connectionString)
 
         insertBookingCmd.ExecuteNonQuery();
 
+        // Totalpris = antal nätter × pris per natt. DayNumber är dagens nummer, så skillnaden blir antal nätter.
         int nights = checkOut.DayNumber - checkIn.DayNumber;
+        Console.WriteLine();
         Console.WriteLine($"{nights} nätter x {price} kr = {nights * price} kr");
 
         return (int)insertBookingCmd.LastInsertedId; // Returnerar bokningsnummer
 
     }
 
-
+    // Krav 4 – Visar den valda kundens bokningar med totalpris.
+    // Två JOINs behövs: Bokningar -> Rum (pris, rumsnummer) -> Boende (hotellnamn, stad).
+    // DATEDIFF(ut, in) räknar antal nätter, och SQL räknar ut totalpriset direkt.
     public void PrintBookings(int customerId)
     {
         using var conn = new MySqlConnection(connectionString);
@@ -209,6 +236,8 @@ public class Db(string connectionString)
         cmd.Parameters.AddWithValue("@customerId", customerId);
         using var reader = cmd.ExecuteReader();
 
+            Console.WriteLine(); // tom rad före listan
+            Console.WriteLine("---Bokningar---");
             int count = 0;
             while (reader.Read())
             {
@@ -241,6 +270,8 @@ public class Db(string connectionString)
     }
 
     // Krav 5 – nya antalet måste rymmas i rummet
+    // JOIN mot Rum gör att WHERE kan kolla kapaciteten. Är rummet för litet uppdateras 0 rader.
+    // Returnerar true om bokningen ändrades, false om den inte finns eller rummet är för litet.
     public bool UpdateGuests(int bookingId, int guests)
     {
         using var conn = new MySqlConnection(connectionString);
@@ -260,7 +291,8 @@ public class Db(string connectionString)
         return rows > 0;
     }
 
-   
+    // Krav 6 – Tar bort en bokning så att rummet blir ledigt igen.
+    // Returnerar true om en rad togs bort, false om bokningsnumret inte finns.
     public bool DeleteBooking(int bookingId)
     {
         using var conn = new MySqlConnection(connectionString);

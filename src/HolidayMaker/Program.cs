@@ -12,8 +12,12 @@ if (!File.Exists(connectionFile))
 }
 var db = new Db(File.ReadAllText(connectionFile).Trim());
 db.TestConnection();
-int? customerId = null; // vald kund
 
+// Vald kund. int? betyder att den kan vara null (= ingen kund vald ännu).
+// Menyval 4–7 kräver att en kund är vald.
+int? customerId = null;
+
+// Huvudloopen: visar menyn om och om igen tills operatören väljer 0.
 while (true)
 {
     Console.WriteLine();
@@ -31,9 +35,8 @@ while (true)
     {
         switch (Console.ReadLine())
         {
-            case "1":
+            case "1": // Registrera kund
                 {
-
                     string firstName = ReadText("Förnamn:");
                     string lastName = ReadText("Efternamn:");
                     string email = ReadText("E-post:");
@@ -41,11 +44,11 @@ while (true)
 
                     int newId = db.AddCustomer(firstName, lastName, email, phone);
                     Console.WriteLine($"Kund registrerad med id {newId}.");
-                    customerId = newId; // valfritt: välj den nya kunden direkt
+                    customerId = newId; // den nya kunden blir vald direkt
                 }
                 break;
 
-            case "2":
+            case "2": // Välj kund: visa alla kunder och spara det id operatören väljer
                 {
                     db.PrintCustomers();
                     int id = ReadInt("Välj kund-id: ");
@@ -53,7 +56,7 @@ while (true)
                 }
                 break;
 
-            case "3":
+            case "3": // Sök lediga rum: samla in alla sökval, sedan sköter SQL i Db.cs filtrering och sortering
                 {
                     Console.WriteLine("Tillgängliga städer: ");
                     db.PrintCities();
@@ -64,16 +67,19 @@ while (true)
                     bool needPool = ReadYesNo("Måste ha en pool (ja/nej): ");
                     bool needResturant = ReadYesNo("Måste hotellet ha en resturang? (ja/nej): ");
                     bool sortByRating = ReadYesNo("Sortera på omdöme? (ja = omdöme, nej = pris): ");
+                    // Avstånden är valfria: Enter ger null = inget filter.
                     int? maxBeach = ReadOptionalInt("Max avstånd till stranden (Skriv in antal meter ellet tryck Enter för att gå vidare): ");
                     int? maxCenter = ReadOptionalInt("Max avståndet till centrum (Skriv in antal meter ellet tryck Enter för att gå vidare): ");
 
+                    Console.WriteLine();
 
                     db.PrintAvailableRooms(city, checkIn, checkOut, guests, needPool, needResturant,
                         maxBeach, maxCenter, sortByRating);
                 }
                 break;
-            case "4":
+            case "4": // Boka rum åt vald kund
                 {
+                    // break inuti if hoppar ur hela case 4 direkt.
                     if (customerId == null)
                     {
                         Console.WriteLine("Välj en kund först (val 2).");
@@ -91,12 +97,14 @@ while (true)
                         break;
                     }
 
+                    // .Value plockar ut talet ur int? (säkert, vi har redan kollat att den inte är null).
+                    // CreateBooking kastar ett undantag om rummet är fullt/för litet -> fångas av catch nedan.
                     int bookingId = db.CreateBooking(customerId.Value, roomId, checkIn, checkOut, guests);
                     Console.WriteLine($"Bokning klar med Bokningsnummer: {bookingId}.");
 
                 }
                 break;
-            case "5":
+            case "5": // Visa vald kunds bokningar med totalpris
                 {
                     if (customerId == null)
                     {
@@ -107,7 +115,7 @@ while (true)
                     db.PrintBookings(customerId.Value);
                 }
                 break;
-            case "6":
+            case "6": // Ändra antal personer på en bokning (kapaciteten kontrolleras i SQL)
                 {
                     if (customerId == null)
                     {
@@ -132,7 +140,7 @@ while (true)
                 }
                 break;
 
-            case "7":
+            case "7": // Avboka: visa bokningarna, fråga om bekräftelse, ta bort
                 {
                     if (customerId == null)
                     {
@@ -171,7 +179,10 @@ while (true)
 }
 
 // ---- Hjälpmetoder för inmatning (fråga igen vid felaktig inmatning) ----
+// Alla följer samma mönster: while (true) -> fråga -> läs -> return om svaret är giltigt,
+// annars skriv ett felmeddelande och loopa igen. Programmet kraschar alltså aldrig på felaktig inmatning.
 
+// Frågar efter ett heltal. TryParse returnerar false i stället för att krascha om det inte är ett tal.
 static int ReadInt(string prompt)
 {
     while (true)
@@ -186,6 +197,8 @@ static int ReadInt(string prompt)
     }
 }
 
+// Frågar efter ett datum i exakt formatet yyyy-MM-dd. InvariantCulture gör att det fungerar
+// likadant oavsett vilka språkinställningar datorn har.
 static DateOnly ReadDate(string prompt)
 {
     while (true)
@@ -202,20 +215,20 @@ static DateOnly ReadDate(string prompt)
 }
 
 // Frågar användaren om ett valfritt heltal (0 eller högre).
-// Retunerar null om användaren lämnar fältet tomt.
-// Frågar igen till giltigt svar.
+// Returnerar null om användaren lämnar fältet tomt.
+// Frågar igen tills svaret är giltigt.
 static int? ReadOptionalInt(string prompt)
 {
-    while (true) // Upprepar tills det retunerar giltigt svar.
+    while (true) // Upprepar tills metoden returnerar ett giltigt svar.
     {
         Console.Write(prompt);
         string? input = Console.ReadLine();
 
-        // Retunerar null om användaren lämnar fältet tomt. 
+        // Returnerar null om användaren lämnar fältet tomt.
         if (string.IsNullOrWhiteSpace(input))
             return null;
 
-        // Godkvänner bar heltal som inte är negativt.
+        // Godkänner bara heltal som inte är negativa.
         if (int.TryParse(input, out int value) && value >= 0)
             return value;
 
@@ -223,23 +236,25 @@ static int? ReadOptionalInt(string prompt)
     }
 }
 
+// Frågar ja/nej och returnerar true/false. Trim + ToLower gör att " JA " också godkänns.
 static bool ReadYesNo(string prompt)
 {
     while (true)
     {
         Console.Write(prompt);
         string? input = Console.ReadLine()?.Trim().ToLower();
-        // 1. Om input är "ja" -> return true
+
         if (input == "ja")
             return true;
-        // 2. Om input är "nej" -> return false
+
         if (input == "nej")
             return false;
-        // 3. Annars: skriv "Ogiltigt svar, skriv ja eller nej
+
         Console.WriteLine("Ogiltigt svar skriv ja eller nej.");
     }
 }
-// Frågare efter en text. Frågar igen om användaren lämnar fältet tomt.
+
+// Frågar efter en text. Frågar igen om användaren lämnar fältet tomt.
 static string ReadText(string prompt)
 {
     while (true)
