@@ -55,17 +55,17 @@ while (true)
 
             case "3":
                 {
-                    Console.WriteLine("Tillgägliga städer:");
+                    Console.WriteLine("Tillgängliga städer: ");
                     db.PrintCities();
-                    string city = ReadText("Stad:");
-                    DateOnly checkIn = ReadDate("Inchecking (yyyy-MM-dd):");
-                    DateOnly checkOut = ReadDate("Utcheckning (yyyy-MM-dd):");
-                    int guests = ReadInt("Antal personer:");
-                    bool needPool = ReadYesNo("Måste ha en pool (ja/nej):");
-                    bool needResturant = ReadYesNo("Måste hotellet ha en resturang? (ja/nej):");
-                    bool sortByRating = ReadYesNo("Sortera på omdöme? (ja = omdöme, nej = pris):");
-                    int? maxBeach = ReadOptionalInt("Max avstånd till stranden (Skriv in antal meter ellet tryck Enter för att gå vidare):");
-                    int? maxCenter = ReadOptionalInt("Max avståndet till centrum (m, Enter = inget filter):");
+                    string city = ReadText("Stad: ");
+                    DateOnly checkIn = ReadDate("Inchecking (yyyy-MM-dd): ");
+                    DateOnly checkOut = ReadDate("Utcheckning (yyyy-MM-dd): ");
+                    int guests = ReadInt("Antal personer: ");
+                    bool needPool = ReadYesNo("Måste ha en pool (ja/nej): ");
+                    bool needResturant = ReadYesNo("Måste hotellet ha en resturang? (ja/nej): ");
+                    bool sortByRating = ReadYesNo("Sortera på omdöme? (ja = omdöme, nej = pris): ");
+                    int? maxBeach = ReadOptionalInt("Max avstånd till stranden (Skriv in antal meter ellet tryck Enter för att gå vidare): ");
+                    int? maxCenter = ReadOptionalInt("Max avståndet till centrum (m, Enter = inget filter): ");
 
 
                     db.PrintAvailableRooms(city, checkIn, checkOut, guests, needPool, needResturant,

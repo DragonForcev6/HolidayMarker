@@ -74,11 +74,62 @@ public class Db(string connectionString)
     // Valfria filter: null = inget filter.
     public void PrintAvailableRooms(string city, DateOnly checkIn, DateOnly checkOut, int guests,
         bool needPool, bool needRestaurant, int? maxBeach, int? maxCenter, bool sortByRating)
-      /*  AND (@maxBeach IS NULL OR Boende.strand_avstand <= @maxBeach)
-        AND (@maxCenter IS NULL OR Boende.centrum_avstand <= @maxCenter)
-        AND (@needPool = 0 OR Boende.pool = 1)
-        AND (@needRestaurant = 0 OR Boende.restaurang = 1) */
-        => throw new NotImplementedException();
+    {
+        using var conn = new MySqlConnection(connectionString);
+        conn.Open();
+
+        // Sortering kan inte vara en @parameter, så välj mellan två fasta texter.
+        string orderBy = sortByRating ? "b.betyg DESC, r.pris_per_natt ASC" : "r.pris_per_natt ASC";
+
+        string sql = $@"SELECT r.id, b.hotell_namn, r.rums_nummer, r.max_personer, r.pris_per_natt,
+                       b.betyg, b.strand_avstand, b.centrum_avstand, b.pool, b.resturang
+                       FROM Rum r
+                       JOIN Boende b ON b.boende_id = r.boende_id
+                       WHERE b.stad = @city
+                        AND r.max_personer >= @guests
+                        AND (@needPool = 0 OR b.pool = 1)
+                        AND (@needResturant = 0 OR b.resturang = 1)
+                        AND (@maxBeach IS NULL OR b.strand_avstand <= @maxBeach)
+                        AND (@maxCenter IS NULL OR b.centrum_avstand <= @maxCenter)
+                        AND NOT EXISTS (
+                             SELECT 1 FROM Bokningar bk
+                             WHERE bk.rum_id = r.id
+                               AND bk.incheckning < @checkOut
+                               AND bk.utcheckning > @checkIn)
+                    ORDER BY {orderBy}";
+
+        using var cmd = new MySqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("@city", city);
+        cmd.Parameters.AddWithValue("@checkIn", checkIn);
+        cmd.Parameters.AddWithValue("@checkOut", checkOut);
+        cmd.Parameters.AddWithValue("@guests", guests);
+        cmd.Parameters.AddWithValue("@needPool", needPool);
+        cmd.Parameters.AddWithValue("@needResturant", needRestaurant);
+        cmd.Parameters.AddWithValue("@maxBeach", (object?)maxBeach ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("@maxCenter", (object?)maxCenter ?? DBNull.Value);
+
+        using var reader = cmd.ExecuteReader();
+
+        int count = 0;
+        while (reader.Read())
+        {
+            count++;
+            int roomId = reader.GetInt32("id");
+            string hotel = reader.GetString("hotell_namn");
+            string roomNumber = reader.GetString("rums_nummer"); // varchar i databasen, t.ex. "A1"
+            int maxPersons = reader.GetInt32("max_personer");
+            decimal price = reader.GetDecimal("pris_per_natt");
+            int rating = reader.GetInt32("betyg");
+
+            Console.WriteLine($"Rum_id: {roomId}, Hotell: {hotel}, Rum: {roomNumber}, Max personer: {maxPersons}, Pris per natt: {price} kr, Betyg: {rating}");
+        }
+
+        if (count == 0)
+        {
+            Console.WriteLine("Tyvärr hittades inga lediga rum.");
+        }
+    }
+       
 
     // Krav 3 – kolla tillgänglighet + kapacitet igen innan INSERT. Returnerar bokningsnummer.
     public int CreateBooking(int customerId, int roomId, DateOnly checkIn, DateOnly checkOut, int guests)
@@ -96,4 +147,5 @@ public class Db(string connectionString)
     public bool DeleteBooking(int bookingId)
         => throw new NotImplementedException();
 }
+
 
