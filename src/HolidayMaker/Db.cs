@@ -12,11 +12,61 @@ public class Db(string connectionString)
     }
 
     // Krav 1
-    public int AddCustomer(string name, string email, string phone)
-        => throw new NotImplementedException();
+    public int AddCustomer(string firstName, string lastName, string email, string phone)
+    {
+        using var conn = new MySqlConnection(connectionString);
+        conn.Open();
+
+        string sql = @"INSERT INTO Kund (fornamn, efternamn, `e-post`, telefon)
+                        VALUES (@fornamn, @efternamn, @epost, @telefon)";
+    
+    using var cmd = new MySqlCommand(sql, conn);
+    cmd.Parameters.AddWithValue("@fornamn", firstName);
+    cmd.Parameters.AddWithValue("@efternamn", lastName);
+    cmd.Parameters.AddWithValue("@epost", email);
+    cmd.Parameters.AddWithValue("@telefon", phone);
+    
+    cmd.ExecuteNonQuery(); // kör INSERT
+        return (int)cmd.LastInsertedId; // id:t som MySql gav ny kund
+    }
 
     public void PrintCustomers()
-        => throw new NotImplementedException();
+    {
+        using var conn = new MySqlConnection(connectionString);
+        conn.Open();
+
+        string sql ="SELECT id, fornamn, efternamn, `e-post`, telefon FROM Kund ORDER BY id";
+        using var cmd = new MySqlCommand(sql, conn);
+        using var reader =cmd.ExecuteReader();
+
+        while (reader.Read())
+        {
+            int id = reader.GetInt32("id");
+            string firstName = reader.GetString("fornamn");
+            string lastName = reader.GetString("efternamn");
+            string email = reader.GetString("e-post");
+            string phone = reader.GetString("telefon");
+
+            Console.WriteLine($"{id}: {firstName} {lastName}, {email}, {phone}");
+        }
+    }
+
+    public void PrintCities()
+    {
+        using var conn = new MySqlConnection(connectionString);
+        conn.Open();
+
+        string sql = "SELECT DISTINCT stad FROM Boende ORDER BY stad";
+        using var cmd = new MySqlCommand(sql, conn);
+        using var reader = cmd.ExecuteReader();
+
+        while (reader.Read())
+        {
+            Console.Write(reader.GetString("stad") + "  "); // skriver stad, ingen radbytning
+        }
+        Console.WriteLine(); // en radbrytning när alla städer är utskrivna.
+
+    }
 
     // Krav 2 – SQL sköter filtrering och sortering.
     // Tips: utcheckningsdagen är ledig. Två perioder överlappar om

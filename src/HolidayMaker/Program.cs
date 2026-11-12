@@ -31,19 +31,40 @@ while (true)
     {
         switch (Console.ReadLine())
         {
-            case "1": /* TODO: fråga namn + kontakt -> db.AddCustomer */ break;
-            case "2": /* TODO: db.PrintCustomers -> välj id -> customerId */ break;
+            case "1":
+                {
+
+                    string firstName = ReadText("Förnamn:");
+                    string lastName = ReadText("Efternamn:");
+                    string email = ReadText("E-post:");
+                    string phone = ReadText("Telefonnummer:");
+
+                    int newId =db.AddCustomer(firstName, lastName, email, phone);
+                    Console.WriteLine($"Kund registrerad med id {newId}.");
+                    customerId = newId; // valfritt: välj den nya kunden direkt
+                }   
+                break;
+
+            case "2":
+                {
+                    db.PrintCustomers();
+                    int id = ReadInt("Välj kund-id: ");
+                    customerId = id;
+                }
+                 break;
+
             case "3":
                 {
-                    Console.Write("Stad:");
-                    string city = Console.ReadLine() ?? "";
+                    Console.WriteLine("Tillgägliga städer:");
+                    db.PrintCities();
+                    string city = ReadText("Stad:");
                     DateOnly checkIn = ReadDate("Inchecking (yyyy-MM-dd):");
                     DateOnly checkOut = ReadDate("Utcheckning (yyyy-MM-dd):");
                     int guests = ReadInt("Antal personer:");
                     bool needPool = ReadYesNo("Måste ha en pool (ja/nej):");
                     bool needResturant = ReadYesNo("Måste hotellet ha en resturang? (ja/nej):");
                     bool sortByRating = ReadYesNo("Sortera på omdöme? (ja = omdöme, nej = pris):");
-                    int? maxBeach = ReadOptionalInt("Max avstånd till stranden (m Enter = inget filter):");
+                    int? maxBeach = ReadOptionalInt("Max avstånd till stranden (Skriv in antal meter ellet tryck Enter för att gå vidare):");
                     int? maxCenter = ReadOptionalInt("Max avståndet till centrum (m, Enter = inget filter):");
 
 
@@ -134,5 +155,20 @@ static bool ReadYesNo(string prompt)
         // 3. Annars: skriv "Ogiltigt svar, skriv ja eller nej
         Console.WriteLine("Ogiltigt svar skriv ja eller nej.");
     }
-}
+}    
+// Frågare efter en text. Frågar igen om användaren lämnar fältet tomt.
+static string ReadText(string prompt)
+    {
+        while (true)
+        {
+            Console.Write(prompt);
+            string? input = Console.ReadLine()?.Trim();
+
+           if (!string.IsNullOrWhiteSpace(input))
+           return input;
+            Console.WriteLine("Du måste skriva någonting.");
+
+        }
+    }
+
 
