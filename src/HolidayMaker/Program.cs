@@ -39,10 +39,10 @@ while (true)
                     string email = ReadText("E-post:");
                     string phone = ReadText("Telefonnummer:");
 
-                    int newId =db.AddCustomer(firstName, lastName, email, phone);
+                    int newId = db.AddCustomer(firstName, lastName, email, phone);
                     Console.WriteLine($"Kund registrerad med id {newId}.");
                     customerId = newId; // valfritt: välj den nya kunden direkt
-                }   
+                }
                 break;
 
             case "2":
@@ -51,7 +51,7 @@ while (true)
                     int id = ReadInt("Välj kund-id: ");
                     customerId = id;
                 }
-                 break;
+                break;
 
             case "3":
                 {
@@ -106,9 +106,59 @@ while (true)
 
                     db.PrintBookings(customerId.Value);
                 }
+                break;
+            case "6":
+                {
+                    if (customerId == null)
+                    {
+                        Console.WriteLine("Välj en kund först (val 2).");
+                        break;
+                    }
+
+                    db.PrintBookings(customerId.Value);
+                    int bookingId = ReadInt("Bokningsnummer:");
+                    int guests = ReadInt("Antal gäster:");
+
+                    if (guests < 1)
+                    {
+                        Console.WriteLine("Antalet gäster måste vara minst 1.");
+                        break;
+                    }
+
+                    if (db.UpdateGuests(bookingId, guests))
+                        Console.WriteLine("Bokningen är uppdaterad.");
+                    else
+                        Console.WriteLine("Kunde inte ändra: bokningen finns inte eller rummet rymmer inte så många.");
+                }
+                break;
+
+            case "7":
+                {
+                    if (customerId == null)
+                    {
+                        Console.WriteLine("Välj en kund först (val 2).");
+                        break;
+                    }
+
+                   db.PrintBookings(customerId.Value);
+                   int bookingId = ReadInt("Avboka bokningsnummret:");
+
+                   if (!ReadYesNo("Är du säker på att du vill avboka? (ja/nej): "))
+                    {
+                        Console.WriteLine("Avbokningen är avbruten.");
+                        break;
+                    }
+
+                    if (db.DeleteBooking(bookingId))
+                    {
+                        Console.WriteLine("Bokningen är avbokad.");
+                    } 
+                    else
+                    {
+                        Console.WriteLine("Det finns ingen bokning med det numret.");
+                    }
+                }
             break;
-            case "6": /* TODO: välj bokning, nytt antal -> db.UpdateGuests */ break;
-            case "7": /* TODO: välj bokning -> db.DeleteBooking */ break;
             case "0": return;
             default: Console.WriteLine("Ogiltigt val."); break;
         }
@@ -188,20 +238,20 @@ static bool ReadYesNo(string prompt)
         // 3. Annars: skriv "Ogiltigt svar, skriv ja eller nej
         Console.WriteLine("Ogiltigt svar skriv ja eller nej.");
     }
-}    
+}
 // Frågare efter en text. Frågar igen om användaren lämnar fältet tomt.
 static string ReadText(string prompt)
+{
+    while (true)
     {
-        while (true)
-        {
-            Console.Write(prompt);
-            string? input = Console.ReadLine()?.Trim();
+        Console.Write(prompt);
+        string? input = Console.ReadLine()?.Trim();
 
-           if (!string.IsNullOrWhiteSpace(input))
-           return input;
-            Console.WriteLine("Du måste skriva någonting.");
+        if (!string.IsNullOrWhiteSpace(input))
+            return input;
+        Console.WriteLine("Du måste skriva någonting.");
 
-        }
     }
+}
 
 

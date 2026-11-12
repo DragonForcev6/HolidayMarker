@@ -242,11 +242,37 @@ public class Db(string connectionString)
 
     // Krav 5 – nya antalet måste rymmas i rummet
     public bool UpdateGuests(int bookingId, int guests)
-        => throw new NotImplementedException();
+    {
+        using var conn = new MySqlConnection(connectionString);
+        conn.Open();
 
-    // Krav 6
+        string sql = @"UPDATE Bokningar bk
+                    JOIN Rum r ON r.id = bk.rum_id
+                    SET bk.antal_personer = @guests
+                    WHERE bk.boknings_id = @bookingId
+                        AND r.max_personer >= @guests";
+
+        using var cmd = new MySqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("@guests", guests);
+        cmd.Parameters.AddWithValue("@bookingId", bookingId);
+
+        int rows = cmd.ExecuteNonQuery();
+        return rows > 0;
+    }
+
+   
     public bool DeleteBooking(int bookingId)
-        => throw new NotImplementedException();
+    {
+        using var conn = new MySqlConnection(connectionString);
+        conn.Open();
+
+        string sql = @"DELETE FROM Bokningar WHERE boknings_id = @bookingId";
+       
+        using var cmd = new MySqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("@bookingId", bookingId);
+
+        return cmd.ExecuteNonQuery() > 0;
+    }
 }
 
 
