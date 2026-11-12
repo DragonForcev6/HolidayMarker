@@ -1,7 +1,8 @@
 -- Holiday Maker – skapa databas och tabeller
 -- Kör detta skript först.
 
--- TODO: CREATE DATABASE (om din databas kräver det)
+CREATE DATABASE IF NOT EXISTS hotel;
+USE hotel;
 
 -- TODO: Tabeller enligt ditt E/R-diagram.
 --       Tänk på: primärnycklar, främmande nycklar, NOT NULL, UNIQUE, CHECK
@@ -23,7 +24,7 @@ CREATE TABLE `Boende` (
   `Beskrivning` varchar(255) NOT NULL,
   `betyg` int NOT NULL CHECK (`betyg` BETWEEN 1 AND 5),
   PRIMARY KEY (`boende_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 
 -- hotel.Kund definition
@@ -36,7 +37,7 @@ CREATE TABLE `Kund` (
   `telefon` varchar(50) NOT NULL,
   PRIMARY KEY (`id`),
   KEY `kund_fornamn_index` (`fornamn`)
-) ENGINE=InnoDB AUTO_INCREMENT=21 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 
 -- hotel.Rum definition
@@ -51,7 +52,7 @@ CREATE TABLE `Rum` (
   UNIQUE KEY `uq_rum_nummer` (`boende_id`, `rums_nummer`),
   KEY `rum_boende_id_foreign` (`boende_id`),
   CONSTRAINT `rum_boende_id_foreign` FOREIGN KEY (`boende_id`) REFERENCES `Boende` (`boende_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=22 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 
 -- hotel.Bokningar definition
@@ -69,5 +70,5 @@ CREATE TABLE `Bokningar` (
   KEY `bokningar_rum_id_foreign` (`rum_id`),
   CONSTRAINT `bokningar_kund_id_foreign` FOREIGN KEY (`kund_id`) REFERENCES `Kund` (`id`),
   CONSTRAINT `bokningar_rum_id_foreign` FOREIGN KEY (`rum_id`) REFERENCES `Rum` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=26 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
         
