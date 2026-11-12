@@ -24,6 +24,10 @@ public class Db(string connectionString)
     // Valfria filter: null = inget filter.
     public void PrintAvailableRooms(string city, DateOnly checkIn, DateOnly checkOut, int guests,
         bool needPool, bool needRestaurant, int? maxBeach, int? maxCenter, bool sortByRating)
+      /*  AND (@maxBeach IS NULL OR Boende.strand_avstand <= @maxBeach)
+        AND (@maxCenter IS NULL OR Boende.centrum_avstand <= @maxCenter)
+        AND (@needPool = 0 OR Boende.pool = 1)
+        AND (@needRestaurant = 0 OR Boende.restaurang = 1) */
         => throw new NotImplementedException();
 
     // Krav 3 – kolla tillgänglighet + kapacitet igen innan INSERT. Returnerar bokningsnummer.
@@ -42,3 +46,4 @@ public class Db(string connectionString)
     public bool DeleteBooking(int bookingId)
         => throw new NotImplementedException();
 }
+

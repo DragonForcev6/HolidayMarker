@@ -41,14 +41,16 @@ while (true)
                     DateOnly checkOut = ReadDate("Utcheckning (yyyy-MM-dd):");
                     int guests = ReadInt("Antal personer:");
                     bool needPool = ReadYesNo("Måste ha en pool (ja/nej):");
-                    bool needResturant = ReadYesNo("Måste ha en resturang? (ja/nej):");
+                    bool needResturant = ReadYesNo("Måste hotellet ha en resturang? (ja/nej):");
+                    bool sortByRating = ReadYesNo("Sortera på omdöme? (ja = omdöme, nej = pris):");
                     int? maxBeach = ReadOptionalInt("Max avstånd till stranden (m Enter = inget filter):");
                     int? maxCenter = ReadOptionalInt("Max avståndet till centrum (m, Enter = inget filter):");
-                    bool sortByRating = ReadYesNo("Sortera på omdöme? (ja = omdöme, nej = pris):");
 
-                    db.PrintAvailableRooms(city, checkIn, checkOut, guests, needPool, needRestaurant,
+
+                    db.PrintAvailableRooms(city, checkIn, checkOut, guests, needPool, needResturant,
                         maxBeach, maxCenter, sortByRating);
-                } break;
+                }
+                break;
             case "4": /* TODO: välj rum, datum, antal -> db.CreateBooking -> visa nr + totalpris */ break;
             case "5": /* TODO: db.PrintBookings(customerId) */ break;
             case "6": /* TODO: välj bokning, nytt antal -> db.UpdateGuests */ break;
@@ -89,7 +91,7 @@ static DateOnly ReadDate(string prompt)
 
         if (DateOnly.TryParseExact(input, "yyyy-MM-dd",
             CultureInfo.InvariantCulture, DateTimeStyles.None, out DateOnly date))
-                return date;
+            return date;
 
         Console.WriteLine("Ogiltigt datum, använd formatet yyyy-MM-dd (t.ex 2026-11-11).");
     }
@@ -100,36 +102,37 @@ static DateOnly ReadDate(string prompt)
 // Frågar igen till giltigt svar.
 static int? ReadOptionalInt(string prompt)
 {
-   while (true) // Upprepar tills det retunerar giltigt svar.
+    while (true) // Upprepar tills det retunerar giltigt svar.
     {
         Console.Write(prompt);
         string? input = Console.ReadLine();
-        
+
         // Retunerar null om användaren lämnar fältet tomt. 
         if (string.IsNullOrWhiteSpace(input))
             return null;
-        
+
         // Godkvänner bar heltal som inte är negativt.
         if (int.TryParse(input, out int value) && value >= 0)
-            return value; 
-        
-        Console.WriteLine("Ogiltigt tal, försök igen.");  
-    }
+            return value;
 
-static bool ReadYesNo(string prompt)
-    {
-        while (true)
-        {
-            Console.Write(prompt);
-            string? input = Console.ReadLine()?.Trim().ToLower();
-            // 1. Om input är "ja" -> return true
-                if (input == "ja")
-                    return true;
-            // 2. Om input är "nej" -> return false
-                if (input == "nej")
-                    return false;
-            // 3. Annars: skriv "Ogiltigt svar, skriv ja eller nej
-            Console.WriteLine("Ogiltigt svar skriv ja eller nej.");  
-        }
+        Console.WriteLine("Ogiltigt tal, försök igen.");
     }
 }
+
+static bool ReadYesNo(string prompt)
+{
+    while (true)
+    {
+        Console.Write(prompt);
+        string? input = Console.ReadLine()?.Trim().ToLower();
+        // 1. Om input är "ja" -> return true
+        if (input == "ja")
+            return true;
+        // 2. Om input är "nej" -> return false
+        if (input == "nej")
+            return false;
+        // 3. Annars: skriv "Ogiltigt svar, skriv ja eller nej
+        Console.WriteLine("Ogiltigt svar skriv ja eller nej.");
+    }
+}
+
