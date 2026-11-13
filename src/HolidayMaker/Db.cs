@@ -8,6 +8,7 @@
 //        ExecuteReader()   -> SELECT som ger flera rader (läses med while (reader.Read()))
 //        ExecuteScalar()   -> SELECT som ger ett enda värde (t.ex. COUNT(*))
 //        ExecuteNonQuery() -> INSERT/UPDATE/DELETE, returnerar antal ändrade rader
+
 using MySqlConnector;
 
 public class Db(string connectionString)
@@ -37,7 +38,7 @@ public class Db(string connectionString)
         cmd.Parameters.AddWithValue("@telefon", phone);
 
         cmd.ExecuteNonQuery(); // kör INSERT
-        return (int)cmd.LastInsertedId; // id:t som MySql gav ny kund
+        return (int)cmd.LastInsertedId; // id:t som MySQL gav den nya kunden
     }
 
     // Skriver ut alla kunder så att operatören kan välja ett kund-id (menyval 2).
@@ -62,9 +63,24 @@ public class Db(string connectionString)
         }
     }
 
-    // Skriver ut alla städer som har boenden, på en rad (menyval 3).
+    // Kollar om det finns en kund med detta id (menyval 2).
+    // ExecuteScalar eftersom COUNT(*) bara ger ett enda värde.
+    public bool CustomerExists(int customerId)
+    {
+        using var conn = new MySqlConnection(connectionString);
+        conn.Open();
+
+        string sql = "SELECT COUNT(*) FROM Kund WHERE id = @customerId";
+        using var cmd = new MySqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("@customerId", customerId);
+
+        return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
+    }
+
+    // Skriver ut alla städer som har boenden på en rad, med ett nummer framför (menyval 3 och 8).
+    // Returnerar städerna som en lista så att operatören kan välja stad med en siffra.
     // DISTINCT tar bort dubbletter om flera hotell ligger i samma stad.
-    public void PrintCities()
+    public List<string> PrintCities()
     {
         using var conn = new MySqlConnection(connectionString);
         conn.Open();
@@ -73,12 +89,16 @@ public class Db(string connectionString)
         using var cmd = new MySqlCommand(sql, conn);
         using var reader = cmd.ExecuteReader();
 
+        var cities = new List<string>();
         while (reader.Read())
         {
-            Console.Write(reader.GetString("stad") + "  "); // skriver stad, ingen radbytning
+            cities.Add(reader.GetString("stad"));
+            Console.Write($"{cities.Count}. {reader.GetString("stad")}  "); // t.ex. "1. Göteborg  "
         }
+
         Console.WriteLine(); // en radbrytning när alla städer är utskrivna.
 
+        return cities;
     }
 
     // Krav 2 – SQL sköter filtrering och sortering.
@@ -107,7 +127,7 @@ public class Db(string connectionString)
                        WHERE b.stad = @city
                         AND r.max_personer >= @guests
                         AND (@needPool = 0 OR b.pool = 1)
-                        AND (@needResturant = 0 OR b.resturang = 1)
+                        AND (@needRestaurant = 0 OR b.resturang = 1)
                         AND (@maxBeach IS NULL OR b.strand_avstand <= @maxBeach)
                         AND (@maxCenter IS NULL OR b.centrum_avstand <= @maxCenter)
                         AND NOT EXISTS (
@@ -123,7 +143,7 @@ public class Db(string connectionString)
         cmd.Parameters.AddWithValue("@checkOut", checkOut);
         cmd.Parameters.AddWithValue("@guests", guests);
         cmd.Parameters.AddWithValue("@needPool", needPool);
-        cmd.Parameters.AddWithValue("@needResturant", needRestaurant);
+        cmd.Parameters.AddWithValue("@needRestaurant", needRestaurant);
         // C#:s null är inte samma sak som SQL:s NULL, därför DBNull.Value när filtret inte används.
         cmd.Parameters.AddWithValue("@maxBeach", (object?)maxBeach ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@maxCenter", (object?)maxCenter ?? DBNull.Value);
@@ -141,7 +161,7 @@ public class Db(string connectionString)
             decimal price = reader.GetDecimal("pris_per_natt");
             int rating = reader.GetInt32("betyg");
 
-            Console.WriteLine($"Rum_id: {roomId}, Hotell: {hotel}, Rum: {roomNumber}, Max personer: {maxPersons}, Pris per natt: {price} kr, Betyg: {rating}");
+            Console.WriteLine($"Rum-id: {roomId}, Hotell: {hotel}, Rum: {roomNumber}, Max personer: {maxPersons}, Pris per natt: {price} kr, Betyg: {rating}");
         }
 
         if (count == 0)
@@ -150,6 +170,48 @@ public class Db(string connectionString)
         }
     }
 
+    // Menyval 8 – Visar alla rum i en stad och vilka perioder de redan är bokade.
+    // LEFT JOIN gör att rum utan bokningar också kommer med (då blir bokningskolumnerna NULL).
+    // Villkoret om utcheckning står i ON och inte i WHERE. Annars skulle rum utan bokningar försvinna.
+    // GROUP_CONCAT slår ihop alla bokade perioder för ett rum till en enda text.
+    public void PrintRoomsWithBookings(string city)
+    {
+        using var conn = new MySqlConnection(connectionString);
+        conn.Open();
+
+        string sql = @"SELECT r.id, b.hotell_namn, r.rums_nummer, r.max_personer, r.pris_per_natt,
+                        GROUP_CONCAT(CONCAT(bk.incheckning, ' - ', bk.utcheckning)
+                            ORDER BY bk.incheckning SEPARATOR ', ') AS bokade
+                    FROM Rum r
+                    JOIN Boende b ON b.boende_id = r.boende_id
+                    LEFT JOIN Bokningar bk ON bk.rum_id = r.id
+                                            AND bk.utcheckning > CURDATE()
+                    WHERE b.stad = @city
+                    GROUP BY r.id, b.hotell_namn, r.rums_nummer, r.max_personer, r.pris_per_natt
+                    ORDER BY b.hotell_namn, r.rums_nummer";
+        
+        using var cmd = new MySqlCommand(sql, conn);
+        cmd.Parameters.AddWithValue("@city", city);
+        using var reader = cmd.ExecuteReader();
+
+        while (reader.Read())
+        {
+            int roomId = reader.GetInt32("id");
+            string hotel = reader.GetString("hotell_namn");
+            string roomNumber = reader.GetString("rums_nummer");
+            int maxPersons = reader.GetInt32("max_personer");
+            decimal price = reader.GetDecimal("pris_per_natt");
+
+            // Har rummet inga bokningar blir "bokade" NULL, och då kan GetString inte läsa den.
+            string booked = reader.IsDBNull(reader.GetOrdinal("bokade"))
+                ? "inga bokningar"
+                : "bokat: " + reader.GetString("bokade");
+            
+            Console.WriteLine($"Rum-id: {roomId}, {hotel}, rum {roomNumber}, max {maxPersons} pers, " +
+                              $"{price} kr/natt - {booked}");
+
+        }
+    }
 
     // Krav 3 – kolla tillgänglighet + kapacitet igen innan INSERT. Returnerar bokningsnummer.
     // Kontrollen görs igen här (fast sökningen redan filtrerat) eftersom operatören kan skriva in
@@ -211,7 +273,6 @@ public class Db(string connectionString)
         Console.WriteLine($"{nights} nätter x {price} kr = {nights * price} kr");
 
         return (int)insertBookingCmd.LastInsertedId; // Returnerar bokningsnummer
-
     }
 
     // Krav 4 – Visar den valda kundens bokningar med totalpris.
@@ -236,43 +297,42 @@ public class Db(string connectionString)
         cmd.Parameters.AddWithValue("@customerId", customerId);
         using var reader = cmd.ExecuteReader();
 
-            Console.WriteLine(); // tom rad före listan
-            Console.WriteLine("---Bokningar---");
-            int count = 0;
-            while (reader.Read())
-            {
-                count++;
+        Console.WriteLine(); // tom rad före listan
+        Console.WriteLine("---Bokningar---");
+        int count = 0;
+        while (reader.Read())
+        {
+            count++;
 
-                // 1. Läs ut varje kolumn från SELECT (namnen måste matcha SQL-frågan)
-                int bookingId = reader.GetInt32("boknings_id");
-                string hotel = reader.GetString("hotell_namn");
-                string city = reader.GetString("stad");
-                string room = reader.GetString("rums_nummer");
-                int guests = reader.GetInt32("antal_personer");
-                DateTime checkIn = reader.GetDateTime("incheckning");
-                DateTime checkOut = reader.GetDateTime("utcheckning");
-                decimal price = reader.GetDecimal("pris_per_natt");
-                long nights = reader.GetInt64("natter");
-                decimal total = reader.GetDecimal("totalpris");
+            // 1. Läs ut varje kolumn från SELECT (namnen måste matcha SQL-frågan)
+            int bookingId = reader.GetInt32("boknings_id");
+            string hotel = reader.GetString("hotell_namn");
+            string city = reader.GetString("stad");
+            string room = reader.GetString("rums_nummer");
+            int guests = reader.GetInt32("antal_personer");
+            DateTime checkIn = reader.GetDateTime("incheckning");
+            DateTime checkOut = reader.GetDateTime("utcheckning");
+            decimal price = reader.GetDecimal("pris_per_natt");
+            long nights = reader.GetInt64("natter");
+            decimal total = reader.GetDecimal("totalpris");
 
-                // 2. Skriv ut bokningen
-                Console.WriteLine($"Bokning {bookingId}: {hotel} ({city}), rum {room}, {guests} pers, " +
-                                  $"{checkIn:yyyy-MM-dd} - {checkOut:yyyy-MM-dd}, " +
-                                  $"{nights} nätter x {price} kr = {total} kr");
-            }
+            // 2. Skriv ut bokningen
+            Console.WriteLine($"Bokning {bookingId}: {hotel} ({city}), rum {room}, {guests} pers, " +
+                              $"{checkIn:yyyy-MM-dd} - {checkOut:yyyy-MM-dd}, " +
+                              $"{nights} nätter x {price} kr = {total} kr");
+        }
 
-            if (count == 0)
-            {
-                Console.WriteLine("Kunden har inga bokningar.");
-            }
-
-        
+        if (count == 0)
+        {
+            Console.WriteLine("Kunden har inga bokningar.");
+        }
     }
 
     // Krav 5 – nya antalet måste rymmas i rummet
     // JOIN mot Rum gör att WHERE kan kolla kapaciteten. Är rummet för litet uppdateras 0 rader.
-    // Returnerar true om bokningen ändrades, false om den inte finns eller rummet är för litet.
-    public bool UpdateGuests(int bookingId, int guests)
+    // Returnerar true om bokningen ändrades, false om den inte finns, tillhör en annan kund
+    // eller rummet är för litet.
+    public bool UpdateGuests(int bookingId, int customerId, int guests)
     {
         using var conn = new MySqlConnection(connectionString);
         conn.Open();
@@ -281,27 +341,32 @@ public class Db(string connectionString)
                     JOIN Rum r ON r.id = bk.rum_id
                     SET bk.antal_personer = @guests
                     WHERE bk.boknings_id = @bookingId
+                        AND bk.kund_id = @customerId
                         AND r.max_personer >= @guests";
 
         using var cmd = new MySqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("@guests", guests);
         cmd.Parameters.AddWithValue("@bookingId", bookingId);
+        cmd.Parameters.AddWithValue("@customerId", customerId);
 
         int rows = cmd.ExecuteNonQuery();
         return rows > 0;
     }
 
     // Krav 6 – Tar bort en bokning så att rummet blir ledigt igen.
-    // Returnerar true om en rad togs bort, false om bokningsnumret inte finns.
-    public bool DeleteBooking(int bookingId)
+    // Returnerar true om en rad togs bort, false om bokningsnumret inte finns eller tillhör en annan kund.
+    public bool DeleteBooking(int bookingId, int customerId)
     {
         using var conn = new MySqlConnection(connectionString);
         conn.Open();
 
-        string sql = @"DELETE FROM Bokningar WHERE boknings_id = @bookingId";
-       
+        string sql = @"DELETE FROM Bokningar
+                    WHERE boknings_id = @bookingId
+                        AND kund_id = @customerId";
+
         using var cmd = new MySqlCommand(sql, conn);
         cmd.Parameters.AddWithValue("@bookingId", bookingId);
+        cmd.Parameters.AddWithValue("@customerId", customerId);
 
         return cmd.ExecuteNonQuery() > 0;
     }

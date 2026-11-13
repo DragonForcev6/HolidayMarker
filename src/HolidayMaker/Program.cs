@@ -1,5 +1,5 @@
 ﻿// Holiday Maker – meny och inmatning.
-// Allt SQL ligger i Db.cs.
+// All SQL ligger i Db.cs.
 
 using System.Globalization;
 
@@ -29,6 +29,7 @@ while (true)
     Console.WriteLine("5. Visa kundens bokningar");
     Console.WriteLine("6. Ändra antal personer");
     Console.WriteLine("7. Avboka");
+    Console.WriteLine("8. Visa alla rum och bokade perioder");
     Console.WriteLine("0. Avsluta");
 
     try
@@ -52,28 +53,30 @@ while (true)
                 {
                     db.PrintCustomers();
                     int id = ReadInt("Välj kund-id: ");
-                    customerId = id;
+
+                    if (db.CustomerExists(id))
+                        customerId = id;
+                    else
+                        Console.WriteLine("Det finns ingen kund med det id:t.");
                 }
                 break;
 
             case "3": // Sök lediga rum: samla in alla sökval, sedan sköter SQL i Db.cs filtrering och sortering
                 {
-                    Console.WriteLine("Tillgängliga städer: ");
-                    db.PrintCities();
-                    string city = ReadText("Stad: ");
-                    DateOnly checkIn = ReadDate("Inchecking (År-Månad-Dag): ");
+                    string city = ReadCity(db);
+                    DateOnly checkIn = ReadDate("Incheckning (År-Månad-Dag): ");
                     DateOnly checkOut = ReadDate("Utcheckning (År-Månad-Dag): ");
                     int guests = ReadInt("Antal personer: ");
-                    bool needPool = ReadYesNo("Måste ha en pool (ja/nej): ");
-                    bool needResturant = ReadYesNo("Måste hotellet ha en resturang? (ja/nej): ");
+                    bool needPool = ReadYesNo("Måste hotellet ha en pool? (ja/nej): ");
+                    bool needRestaurant = ReadYesNo("Måste hotellet ha en restaurang? (ja/nej): ");
                     bool sortByRating = ReadYesNo("Sortera på omdöme? (ja = omdöme, nej = pris): ");
                     // Avstånden är valfria: Enter ger null = inget filter.
-                    int? maxBeach = ReadOptionalInt("Max avstånd till stranden (Skriv in antal meter ellet tryck Enter för att gå vidare): ");
-                    int? maxCenter = ReadOptionalInt("Max avståndet till centrum (Skriv in antal meter ellet tryck Enter för att gå vidare): ");
+                    int? maxBeach = ReadOptionalInt("Max avstånd till stranden (Skriv in antal meter eller tryck Enter för att gå vidare): ");
+                    int? maxCenter = ReadOptionalInt("Max avstånd till centrum (Skriv in antal meter eller tryck Enter för att gå vidare): ");
 
                     Console.WriteLine();
 
-                    db.PrintAvailableRooms(city, checkIn, checkOut, guests, needPool, needResturant,
+                    db.PrintAvailableRooms(city, checkIn, checkOut, guests, needPool, needRestaurant,
                         maxBeach, maxCenter, sortByRating);
                 }
                 break;
@@ -100,7 +103,7 @@ while (true)
                     // .Value plockar ut talet ur int? (säkert, vi har redan kollat att den inte är null).
                     // CreateBooking kastar ett undantag om rummet är fullt/för litet -> fångas av catch nedan.
                     int bookingId = db.CreateBooking(customerId.Value, roomId, checkIn, checkOut, guests);
-                    Console.WriteLine($"Bokning klar med Bokningsnummer: {bookingId}.");
+                    Console.WriteLine($"Bokning klar med bokningsnummer: {bookingId}.");
 
                 }
                 break;
@@ -133,10 +136,10 @@ while (true)
                         break;
                     }
 
-                    if (db.UpdateGuests(bookingId, guests))
+                    if (db.UpdateGuests(bookingId, customerId.Value, guests))
                         Console.WriteLine("Bokningen är uppdaterad.");
                     else
-                        Console.WriteLine("Kunde inte ändra: bokningen finns inte eller rummet rymmer inte så många.");
+                        Console.WriteLine("Kunde inte ändra: kunden har ingen sådan bokning eller rummet rymmer inte så många.");
                 }
                 break;
 
@@ -148,25 +151,34 @@ while (true)
                         break;
                     }
 
-                   db.PrintBookings(customerId.Value);
-                   int bookingId = ReadInt("Avboka bokningsnummret:");
+                    db.PrintBookings(customerId.Value);
+                    int bookingId = ReadInt("Avboka bokningsnumret:");
 
-                   if (!ReadYesNo("Är du säker på att du vill avboka? (ja/nej): "))
+                    if (!ReadYesNo("Är du säker på att du vill avboka? (ja/nej): "))
                     {
                         Console.WriteLine("Avbokningen är avbruten.");
                         break;
                     }
 
-                    if (db.DeleteBooking(bookingId))
+                    if (db.DeleteBooking(bookingId, customerId.Value))
                     {
                         Console.WriteLine("Bokningen är avbokad.");
-                    } 
+                    }
                     else
                     {
-                        Console.WriteLine("Det finns ingen bokning med det numret.");
+                        Console.WriteLine("Kunden har ingen bokning med det numret.");
                     }
                 }
-            break;
+                break;
+
+            case "8": // Visa alla rum i en stad och när de är bokade (inga datum behövs)
+                {
+                    string city = ReadCity(db);
+                    Console.WriteLine();
+                    db.PrintRoomsWithBookings(city);
+                }
+                break;
+
             case "0": return;
             default: Console.WriteLine("Ogiltigt val."); break;
         }
@@ -210,7 +222,7 @@ static DateOnly ReadDate(string prompt)
             CultureInfo.InvariantCulture, DateTimeStyles.None, out DateOnly date))
             return date;
 
-        Console.WriteLine("Ogiltigt datum, använd formatet yyyy-MM-dd (t.ex 2026-11-11).");
+        Console.WriteLine("Ogiltigt datum, använd formatet yyyy-MM-dd (t.ex. 2026-11-11).");
     }
 }
 
@@ -250,7 +262,7 @@ static bool ReadYesNo(string prompt)
         if (input == "nej")
             return false;
 
-        Console.WriteLine("Ogiltigt svar skriv ja eller nej.");
+        Console.WriteLine("Ogiltigt svar, skriv ja eller nej.");
     }
 }
 
@@ -265,7 +277,24 @@ static string ReadText(string prompt)
         if (!string.IsNullOrWhiteSpace(input))
             return input;
         Console.WriteLine("Du måste skriva någonting.");
+    }
+}
 
+// Visar städerna med nummer och frågar tills operatören väljer en siffra som finns.
+// Returnerar namnet på staden. Används av menyval 3 och 8.
+static string ReadCity(Db db)
+{
+    Console.WriteLine("Tillgängliga städer: ");
+    List<string> cities = db.PrintCities();
+
+    while (true)
+    {
+        int choice = ReadInt("Välj stad (siffra): ");
+
+        if (choice >= 1 && choice <= cities.Count)
+            return cities[choice - 1]; // listan börjar på 0 men menyn på 1
+
+        Console.WriteLine($"Välj en siffra mellan 1 och {cities.Count}.");
     }
 }
 

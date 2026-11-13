@@ -1,7 +1,8 @@
 # Holiday Maker
 
 Konsolapplikation för en fiktiv resebyrå (Boundless Horizons). Operatören kan registrera kunder,
-söka lediga rum med filter, boka, visa bokningar med totalpris, ändra antal personer och avboka.
+söka lediga rum med filter, boka, visa bokningar med totalpris, ändra antal personer, avboka
+och se alla rum i en stad med de perioder som redan är bokade.
 
 Byggd i C# (.NET 10) mot en MySQL-databas.
 
@@ -38,6 +39,10 @@ Alla tester är gjorda mot testdatan i `02_testdata.sql`.
 | Kombinerade filter + båda sorteringarna | ✅ Pool + restaurang + max 100 m till strand ger inga träffar i Malmö, max 200 m ger träffar. Båda sorteringarna körs utan fel, men eftersom varje stad bara har ett hotell i testdatan blir ordningen densamma (se Reflektion) |
 | Ändring av antal personer följer kapacitet | ✅ Enkelrum: 1 person godkänns, 3 personer nekas |
 | Avbokning frigör rummet | ✅ Efter avbokning visas rummet igen i sökningen för samma period |
+| Kund-id som inte finns kan inte väljas | ✅ Kund-id 999 ger "Det finns ingen kund med det id:t" och ingen kund blir vald |
+| Bara egna bokningar kan ändras och avbokas | ✅ Med kund 1 vald nekas ändring och avbokning av bokning 2 (som tillhör kund 2). Kund 1:s egen bokning 1 går att ändra och avboka |
+| Stad väljs med en siffra | ✅ Städerna visas som "1. Göteborg  2. Malmö ...". Siffran för Malmö ger samma träffar som förut. 0, 9 och "abc" ger en ny fråga |
+| Alla rum och bokade perioder (menyval 8) | ✅ Malmö visar bokningarna 12–18 dec på rum 14–17. Rum utan kommande bokningar visar "inga bokningar" |
 | Data finns kvar efter omstart | ✅ Kund och bokningar som skapats i programmet finns kvar när programmet startas om |
 
 Testfall som finns färdiga i testdatan:

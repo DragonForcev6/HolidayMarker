@@ -66,6 +66,7 @@ CREATE TABLE `Bokningar` (
   `utcheckning` date NOT NULL,
   PRIMARY KEY (`boknings_id`),
   CONSTRAINT `chk_datum` CHECK (`utcheckning` > `incheckning`),
+  CONSTRAINT `chk_antal_personer` CHECK (`antal_personer` > 0),
   KEY `bokningar_kund_id_foreign` (`kund_id`),
   KEY `bokningar_rum_id_foreign` (`rum_id`),
   CONSTRAINT `bokningar_kund_id_foreign` FOREIGN KEY (`kund_id`) REFERENCES `Kund` (`id`),
